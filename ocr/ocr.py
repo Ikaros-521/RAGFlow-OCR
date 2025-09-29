@@ -82,12 +82,35 @@ def load_model(model_dir, nm, device_id: int | None = None):
 
     def cuda_is_available():
         try:
-            import torch
-            if torch.cuda.is_available() and torch.cuda.device_count() > device_id:
+            # 检查是否被强制禁用CUDA
+            import os
+            if os.environ.get('CUDA_VISIBLE_DEVICES') == '-1' or os.environ.get('ORT_DISABLE_CUDA') == '1':
+                print("CUDA 被环境变量强制禁用")
+                return False
+            
+            # 首先检查 ONNX Runtime 是否支持 CUDA
+            import onnxruntime as ort
+            if 'CUDAExecutionProvider' not in ort.get_available_providers():
+                print("ONNX Runtime 不支持 CUDAExecutionProvider")
+                return False
+            
+            # 然后检查 PyTorch CUDA 支持
+            try:
+                import torch
+                if not torch.cuda.is_available():
+                    print("PyTorch CUDA 不可用")
+                    return False
+                if device_id is not None and torch.cuda.device_count() <= device_id:
+                    print(f"CUDA 设备数量不足: {torch.cuda.device_count()} <= {device_id}")
+                    return False
                 return True
-        except Exception:
+            except Exception as e:
+                print(f"PyTorch CUDA 检查失败: {e}")
+                # 即使 PyTorch 不可用，只要 ONNX Runtime 支持 CUDA 就可以
+                return True
+        except Exception as e:
+            print(f"CUDA check failed: {e}")
             return False
-        return False
 
     options = ort.SessionOptions()
     options.enable_cpu_mem_arena = False
@@ -99,18 +122,15 @@ def load_model(model_dir, nm, device_id: int | None = None):
     # Shrink GPU memory after execution
     run_options = ort.RunOptions()
     if cuda_is_available():
-        cuda_provider_options = {
-            "device_id": device_id, # Use specific GPU
-            "gpu_mem_limit": 512 * 1024 * 1024, # Limit gpu memory
-            "arena_extend_strategy": "kNextPowerOfTwo",  # gpu memory allocation strategy
-        }
+        # 简化CUDA配置，避免provider_options解析错误
         sess = ort.InferenceSession(
             model_file_path,
             options=options,
-            providers=['CUDAExecutionProvider'],
-            provider_options=[cuda_provider_options]
+            providers=['CUDAExecutionProvider', 'CPUExecutionProvider']
             )
-        run_options.add_run_config_entry("memory.enable_memory_arena_shrinkage", "gpu:" + str(device_id))
+        # 简化内存配置，避免 device_id 配置错误
+        run_options.add_run_config_entry("memory.enable_memory_arena_shrinkage", "gpu:0")
+        print(f"load_model {model_file_path} uses GPU")
         logging.info(f"load_model {model_file_path} uses GPU")
     else:
         sess = ort.InferenceSession(
@@ -118,6 +138,7 @@ def load_model(model_dir, nm, device_id: int | None = None):
             options=options,
             providers=['CPUExecutionProvider'])
         run_options.add_run_config_entry("memory.enable_memory_arena_shrinkage", "cpu")
+        print(f"load_model {model_file_path} uses CPU")
         logging.info(f"load_model {model_file_path} uses CPU")
     loaded_model = (sess, run_options)
     loaded_models[model_cached_tag] = loaded_model

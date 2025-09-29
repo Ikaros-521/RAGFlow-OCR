@@ -1,4 +1,7 @@
-onnxruntime>=1.15.0
+# CPU
+# onnxruntime>=1.15.0
+# GPU
+onnxruntime-gpu>=1.15.0
 opencv-python>=4.8.0
 numpy>=1.21.0
 Pillow>=9.0.0
@@ -6,3 +9,6 @@ huggingface_hub>=0.16.0
 six>=1.16.0
 shapely>=1.8.0
 pyclipper>=1.3.0
+# pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+torch>=2.5.0
+torchvision>=0.16.0
