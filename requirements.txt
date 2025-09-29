@@ -12,3 +12,8 @@ pyclipper>=1.3.0
 # pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
 torch>=2.5.0
 torchvision>=0.16.0
+# For performance analysis and visualization
+matplotlib>=3.6.0
+seaborn>=0.12.0
+pandas>=1.5.0
+numpy>=1.21.0
